@@ -68,9 +68,10 @@
 #endif
 
 #if defined(PROBE_CDC_UART)
-#define PROBE_UART_TX 4
-#define PROBE_UART_RX 5
-#define PROBE_UART_INTERFACE uart1
+#define PROBE_UART_TX 17
+#define PROBE_UART_RX 16
+/* The UART bridge claims two state machines from this PIO instance. */
+#define PROBE_UART_PIO pio1
 #define PROBE_UART_BAUDRATE 115200
 
 #if defined(PROBE_UART_HWFC)

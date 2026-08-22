@@ -28,6 +28,7 @@
 #include "task.h"
 #include "tusb.h"
 #include "autobaud.h"
+#include "pio_uart.h"
 
 #include "probe_config.h"
 
@@ -54,11 +55,7 @@ static uint rx_led_debounce;
 static BaudInfo_t baud_info;
 
 void cdc_uart_init(void) {
-    gpio_set_function(PROBE_UART_TX, GPIO_FUNC_UART);
-    gpio_set_function(PROBE_UART_RX, GPIO_FUNC_UART);
-    gpio_set_pulls(PROBE_UART_TX, 1, 0);
-    gpio_set_pulls(PROBE_UART_RX, 1, 0);
-    uart_init(PROBE_UART_INTERFACE, PROBE_UART_BAUDRATE);
+    pio_uart_init(PROBE_UART_BAUDRATE);
 
 #ifdef PROBE_UART_TX_LED
     tx_led_debounce = 0;
@@ -71,16 +68,6 @@ void cdc_uart_init(void) {
     gpio_set_dir(PROBE_UART_RX_LED, GPIO_OUT);
 #endif
 
-#ifdef PROBE_UART_HWFC
-    /* HWFC implies that hardware flow control is implemented and the
-     * UART operates in "full-duplex" mode (See USB CDC PSTN120 6.3.12).
-     * Default to pulling in the active direction, so an unconnected CTS
-     * behaves the same as if CTS were not enabled. */
-    gpio_set_pulls(PROBE_UART_CTS, 0, 1);
-    gpio_set_function(PROBE_UART_RTS, GPIO_FUNC_UART);
-    gpio_set_function(PROBE_UART_CTS, GPIO_FUNC_UART);
-    uart_set_hw_flow(PROBE_UART_INTERFACE, true, true);
-#else
 #ifdef PROBE_UART_RTS
     gpio_init(PROBE_UART_RTS);
     gpio_set_dir(PROBE_UART_RTS, GPIO_OUT);
@@ -103,8 +90,8 @@ bool cdc_task(void)
     bool keep_alive = false;
 
     // Consume uart fifo regardless even if not connected
-    while(uart_is_readable(PROBE_UART_INTERFACE) && (rx_len < sizeof(rx_buf))) {
-        rx_buf[rx_len++] = uart_getc(PROBE_UART_INTERFACE);
+    while(pio_uart_is_readable() && (rx_len < sizeof(rx_buf))) {
+        rx_buf[rx_len++] = pio_uart_getc();
     }
 
     if (tud_cdc_connected()) {
@@ -143,9 +130,9 @@ bool cdc_task(void)
         tx_led_debounce = debounce_ticks;
 #endif
         /* Batch up to half a FIFO of data - don't clog up on RX */
-        watermark = MIN(watermark, 16);
+        watermark = MIN(watermark, 4);
         tx_len = tud_cdc_read(tx_buf, watermark);
-        uart_write_blocking(PROBE_UART_INTERFACE, tx_buf, tx_len);
+        pio_uart_write_blocking(tx_buf, tx_len);
       } else {
 #ifdef PROBE_UART_TX_LED
           if (tx_led_debounce)
@@ -158,7 +145,7 @@ bool cdc_task(void)
       if (timed_break) {
         if (((int)break_expiry - (int)xTaskGetTickCount()) < 0) {
           timed_break = false;
-          uart_set_break(PROBE_UART_INTERFACE, false);
+          pio_uart_set_break(false);
 #ifdef PROBE_UART_TX_LED
           tx_led_debounce = 0;
 #endif
@@ -168,7 +155,7 @@ bool cdc_task(void)
       }
     } else if (was_connected) {
       tud_cdc_write_clear();
-      uart_set_break(PROBE_UART_INTERFACE, false);
+      pio_uart_set_break(false);
       timed_break = false;
       was_connected = 0;
 #ifdef PROBE_UART_TX_LED
@@ -183,16 +170,15 @@ void cdc_uart_set_baudrate(uint32_t baudrate) {
   /* Set the tick thread interval to the amount of time it takes to
    * fill up half a FIFO. Millis is too coarse for integer divide.
    */
-  uint32_t micros = (1000 * 1000 * 16 * 10) / MAX(baudrate, 1);
+  uint32_t micros = (1000 * 1000 * 4 * 10) / MAX(baudrate, 1);
   interval = MAX(1, micros / ((1000 * 1000) / configTICK_RATE_HZ));
   debounce_ticks = MAX(1, configTICK_RATE_HZ / (interval * DEBOUNCE_MS));
   probe_info("New baud rate %ld micros %ld interval %lu\n",
               baudrate, micros, interval);
-  uart_deinit(PROBE_UART_INTERFACE);
   tud_cdc_write_clear();
   tud_cdc_read_flush();
 
-  uart_init(PROBE_UART_INTERFACE, baudrate);
+  pio_uart_set_baudrate(baudrate);
 }
 
 void cdc_thread(void *ptr)
@@ -212,7 +198,7 @@ void cdc_thread(void *ptr)
         if (xQueueReceive(baudQueue, &baud_info, 0) == pdTRUE) {
           cdc_uart_set_baudrate(baud_info.baud);
           // Assume 8N1
-          uart_set_format(PROBE_UART_INTERFACE, 8, 1, UART_PARITY_NONE);
+          pio_uart_set_format(8, 1, PIO_UART_PARITY_NONE);
         }
       }
     }
@@ -229,7 +215,7 @@ void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* line_coding)
   else if (autobaud_running) {
     autobaud_wait_stop();
   }
-  uart_parity_t parity;
+  pio_uart_parity_t parity;
   uint data_bits, stop_bits;
 
   /* Modifying state, so park the thread before changing it. */
@@ -240,16 +226,16 @@ void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* line_coding)
 
   switch (line_coding->parity) {
   case CDC_LINE_CODING_PARITY_ODD:
-    parity = UART_PARITY_ODD;
+    parity = PIO_UART_PARITY_ODD;
     break;
   case CDC_LINE_CODING_PARITY_EVEN:
-    parity = UART_PARITY_EVEN;
+    parity = PIO_UART_PARITY_EVEN;
     break;
   default:
     probe_info("invalid parity setting %u\n", line_coding->parity);
     /* fallthrough */
   case CDC_LINE_CODING_PARITY_NONE:
-    parity = UART_PARITY_NONE;
+    parity = PIO_UART_PARITY_NONE;
     break;
   }
 
@@ -281,7 +267,7 @@ void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* line_coding)
   break;
   }
 
-  uart_set_format(PROBE_UART_INTERFACE, data_bits, stop_bits, parity);
+  pio_uart_set_format(data_bits, stop_bits, parity);
   /* Windows likes to arbitrarily set/get line coding after dtr/rts changes, so
    * don't resume if we shouldn't */
   if(tud_cdc_connected())
@@ -316,14 +302,14 @@ void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
 void tud_cdc_send_break_cb(uint8_t itf, uint16_t wValue) {
   switch(wValue) {
     case 0:
-    uart_set_break(PROBE_UART_INTERFACE, false);
+    pio_uart_set_break(false);
     timed_break = false;
 #ifdef PROBE_UART_TX_LED
     tx_led_debounce = 0;
 #endif
     break;
     case 0xffff:
-    uart_set_break(PROBE_UART_INTERFACE, true);
+    pio_uart_set_break(true);
     timed_break = false;
 #ifdef PROBE_UART_TX_LED
     gpio_put(PROBE_UART_TX_LED, 1);
@@ -331,7 +317,7 @@ void tud_cdc_send_break_cb(uint8_t itf, uint16_t wValue) {
 #endif
     break;
     default:
-    uart_set_break(PROBE_UART_INTERFACE, true);
+    pio_uart_set_break(true);
     timed_break = true;
 #ifdef PROBE_UART_TX_LED
     gpio_put(PROBE_UART_TX_LED, 1);

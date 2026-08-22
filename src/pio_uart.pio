@@ -1,0 +1,58 @@
+; PIO programs ported from https://github.com/adafruit/Adafruit_CircuitPython_PIO_UART.
+; Y = bitcount - 1.
+
+.program pio_uart_tx
+.side_set 1 opt
+public two_stop:
+    nop             side 1 [7]
+.wrap_target
+    pull            side 1 [7]
+    mov x, y        side 0 [7]
+bitloop:
+    out pins, 1
+    jmp x-- bitloop        [6]
+.wrap
+
+.program pio_uart_tx_hwfc
+.side_set 1 opt
+public two_stop:
+    nop             side 1 [7]
+.wrap_target
+    pull            side 1 [7]
+    wait 0 pin 0
+    mov x, y        side 0 [7]
+bitloop:
+    out pins, 1
+    jmp x-- bitloop        [6]
+.wrap
+
+.program pio_uart_rx
+.wrap_target
+start:
+    wait 0 pin 0
+    mov x, y               [10]
+bitloop:
+    in pins, 1
+    jmp x-- bitloop        [6]
+    jmp pin good_stop
+    wait 1 pin 0
+    jmp start
+good_stop:
+    push
+.wrap
+
+.program pio_uart_rx_hwfc
+.wrap_target
+start:
+    mov pins, !status
+    jmp pin start
+    mov x, y               [10]
+bitloop:
+    in pins, 1
+    jmp x-- bitloop        [6]
+    jmp pin good_stop
+    wait 1 pin 0
+    jmp start
+good_stop:
+    push
+.wrap
