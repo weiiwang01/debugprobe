@@ -132,39 +132,60 @@ pio_uart_configure_state_machines(void)
   pio_sm_config tx_config = pio_get_default_sm_config();
   sm_config_set_wrap(&tx_config, tx_entry, (uint)tx_offset + PIO_UART_TX_WRAP);
   sm_config_set_sideset(&tx_config, 2, true, false);
-  sm_config_set_out_pins(&tx_config, PROBE_UART_TX, 1);
-  sm_config_set_sideset_pins(&tx_config, PROBE_UART_TX);
+  sm_config_set_out_pins(&tx_config, probe_pin_mappings[PROBE_FUNC_UART_TX], 1);
+  sm_config_set_sideset_pins(&tx_config, probe_pin_mappings[PROBE_FUNC_UART_TX]);
   sm_config_set_out_shift(&tx_config, true, false, 32);
   sm_config_set_fifo_join(&tx_config, PIO_FIFO_JOIN_TX);
   sm_config_set_clkdiv(&tx_config, divider);
 #ifdef PROBE_UART_HWFC
-  sm_config_set_in_pins(&tx_config, PROBE_UART_CTS);
+  sm_config_set_in_pins(&tx_config, probe_pin_mappings[PROBE_FUNC_UART_CTS]);
 #endif
   pio_sm_init(uart_pio, tx_sm, tx_entry, &tx_config);
 
   pio_sm_config rx_config = pio_get_default_sm_config();
   sm_config_set_wrap(&rx_config, (uint)rx_offset + PIO_UART_RX_WRAP_TARGET,
                      (uint)rx_offset + PIO_UART_RX_WRAP);
-  sm_config_set_in_pins(&rx_config, PROBE_UART_RX);
-  sm_config_set_jmp_pin(&rx_config, PROBE_UART_RX);
+  sm_config_set_in_pins(&rx_config, probe_pin_mappings[PROBE_FUNC_UART_RX]);
+  sm_config_set_jmp_pin(&rx_config, probe_pin_mappings[PROBE_FUNC_UART_RX]);
   sm_config_set_in_shift(&rx_config, true, false, 32);
   sm_config_set_fifo_join(&rx_config, PIO_FIFO_JOIN_RX);
   sm_config_set_clkdiv(&rx_config, divider);
 #ifdef PROBE_UART_HWFC
-  sm_config_set_out_pins(&rx_config, PROBE_UART_RTS, 1);
+  sm_config_set_out_pins(&rx_config, probe_pin_mappings[PROBE_FUNC_UART_RTS], 1);
   sm_config_set_mov_status(&rx_config, STATUS_RX_LESSTHAN, 7);
 #endif
   pio_sm_init(uart_pio, rx_sm, (uint)rx_offset + PIO_UART_RX_WRAP_TARGET,
               &rx_config);
   pio_uart_set_frame_count();
 
-  pio_sm_set_pins_with_mask(uart_pio, tx_sm, 1u << PROBE_UART_TX,
-                            1u << PROBE_UART_TX);
+  pio_sm_set_pins_with_mask(uart_pio, tx_sm,
+                            1u << probe_pin_mappings[PROBE_FUNC_UART_TX],
+                            1u << probe_pin_mappings[PROBE_FUNC_UART_TX]);
 #ifdef PROBE_UART_HWFC
-  pio_sm_set_pins_with_mask(uart_pio, rx_sm, 0, 1u << PROBE_UART_RTS);
+  pio_sm_set_pins_with_mask(uart_pio, rx_sm, 0,
+                            1u << probe_pin_mappings[PROBE_FUNC_UART_RTS]);
 #endif
   pio_set_sm_mask_enabled(uart_pio, sm_mask, true);
   break_enabled = false;
+}
+
+static void
+pio_uart_configure_gpio(void)
+{
+  pio_gpio_init(uart_pio, probe_pin_mappings[PROBE_FUNC_UART_TX]);
+  pio_gpio_init(uart_pio, probe_pin_mappings[PROBE_FUNC_UART_RX]);
+  pio_sm_set_consecutive_pindirs(uart_pio, tx_sm, probe_pin_mappings[PROBE_FUNC_UART_TX], 1, true);
+  pio_sm_set_consecutive_pindirs(uart_pio, rx_sm, probe_pin_mappings[PROBE_FUNC_UART_RX], 1, false);
+  gpio_pull_up(probe_pin_mappings[PROBE_FUNC_UART_TX]);
+  gpio_pull_up(probe_pin_mappings[PROBE_FUNC_UART_RX]);
+
+#ifdef PROBE_UART_HWFC
+  pio_gpio_init(uart_pio, probe_pin_mappings[PROBE_FUNC_UART_CTS]);
+  pio_sm_set_consecutive_pindirs(uart_pio, tx_sm, probe_pin_mappings[PROBE_FUNC_UART_CTS], 1, false);
+  gpio_pull_up(probe_pin_mappings[PROBE_FUNC_UART_CTS]);
+  pio_gpio_init(uart_pio, probe_pin_mappings[PROBE_FUNC_UART_RTS]);
+  pio_sm_set_consecutive_pindirs(uart_pio, rx_sm, probe_pin_mappings[PROBE_FUNC_UART_RTS], 1, true);
+#endif
 }
 
 void
@@ -173,24 +194,22 @@ pio_uart_init(uint32_t baudrate)
   tx_sm = pio_claim_unused_sm(uart_pio, true);
   rx_sm = pio_claim_unused_sm(uart_pio, true);
 
-  pio_gpio_init(uart_pio, PROBE_UART_TX);
-  pio_gpio_init(uart_pio, PROBE_UART_RX);
-  pio_sm_set_consecutive_pindirs(uart_pio, tx_sm, PROBE_UART_TX, 1, true);
-  pio_sm_set_consecutive_pindirs(uart_pio, rx_sm, PROBE_UART_RX, 1, false);
-  gpio_pull_up(PROBE_UART_TX);
-  gpio_pull_up(PROBE_UART_RX);
-
-#ifdef PROBE_UART_HWFC
-  pio_gpio_init(uart_pio, PROBE_UART_CTS);
-  pio_sm_set_consecutive_pindirs(uart_pio, tx_sm, PROBE_UART_CTS, 1, false);
-  gpio_pull_up(PROBE_UART_CTS);
-  pio_gpio_init(uart_pio, PROBE_UART_RTS);
-  pio_sm_set_consecutive_pindirs(uart_pio, rx_sm, PROBE_UART_RTS, 1, true);
-#endif
-
   uart_baudrate = baudrate;
   pio_uart_load_programs();
+  pio_uart_configure_gpio();
   pio_uart_configure_state_machines();
+}
+
+void
+pio_update_pins(void)
+{
+  const bool restore_break = break_enabled;
+
+  pio_set_sm_mask_enabled(uart_pio, (1u << tx_sm) | (1u << rx_sm), false);
+  pio_uart_configure_gpio();
+  pio_uart_configure_state_machines();
+  if (restore_break)
+    pio_uart_set_break(true);
 }
 
 void
@@ -220,8 +239,9 @@ pio_uart_set_break(bool enabled)
   pio_sm_clear_fifos(uart_pio, tx_sm);
   pio_sm_restart(uart_pio, tx_sm);
   pio_sm_set_pins_with_mask(uart_pio, tx_sm,
-                            (enabled ? 0u : 1u) << PROBE_UART_TX,
-                            1u << PROBE_UART_TX);
+                            (enabled ? 0u : 1u)
+                                << probe_pin_mappings[PROBE_FUNC_UART_TX],
+                            1u << probe_pin_mappings[PROBE_FUNC_UART_TX]);
   if (!enabled)
     {
       pio_sm_exec(uart_pio, tx_sm, pio_encode_jmp(pio_uart_tx_entry()));

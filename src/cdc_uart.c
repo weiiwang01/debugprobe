@@ -53,6 +53,26 @@ static uint rx_led_debounce;
 #endif
 
 static BaudInfo_t baud_info;
+#if defined(PROBE_UART_RTS) && !defined(PROBE_UART_HWFC)
+static bool uart_rts;
+#endif
+#ifdef PROBE_UART_DTR
+static bool uart_dtr;
+#endif
+
+static void cdc_uart_configure_control_pins(void) {
+#if defined(PROBE_UART_RTS) && !defined(PROBE_UART_HWFC)
+    gpio_init(probe_pin_mappings[PROBE_FUNC_UART_RTS]);
+    gpio_set_dir(probe_pin_mappings[PROBE_FUNC_UART_RTS], GPIO_OUT);
+    gpio_put(probe_pin_mappings[PROBE_FUNC_UART_RTS], !uart_rts);
+#endif
+
+#ifdef PROBE_UART_DTR
+    gpio_init(probe_pin_mappings[PROBE_FUNC_UART_DTR]);
+    gpio_set_dir(probe_pin_mappings[PROBE_FUNC_UART_DTR], GPIO_OUT);
+    gpio_put(probe_pin_mappings[PROBE_FUNC_UART_DTR], !uart_dtr);
+#endif
+}
 
 void cdc_uart_init(void) {
     pio_uart_init(PROBE_UART_BAUDRATE);
@@ -68,18 +88,27 @@ void cdc_uart_init(void) {
     gpio_set_dir(PROBE_UART_RX_LED, GPIO_OUT);
 #endif
 
-#ifdef PROBE_UART_RTS
-    gpio_init(PROBE_UART_RTS);
-    gpio_set_dir(PROBE_UART_RTS, GPIO_OUT);
-    gpio_put(PROBE_UART_RTS, 1);
-#endif
-#endif
+    cdc_uart_configure_control_pins();
+}
 
-#ifdef PROBE_UART_DTR
-    gpio_init(PROBE_UART_DTR);
-    gpio_set_dir(PROBE_UART_DTR, GPIO_OUT);
-    gpio_put(PROBE_UART_DTR, 1);
-#endif
+void cdc_uart_update_pins(void)
+{
+  const bool restart_autobaud = autobaud_running;
+  const bool resume_uart = uart_taskhandle != NULL
+                           && eTaskGetState(uart_taskhandle) != eSuspended;
+
+  if (restart_autobaud)
+    autobaud_wait_stop();
+  if (resume_uart)
+    vTaskSuspend(uart_taskhandle);
+
+  pio_update_pins();
+  cdc_uart_configure_control_pins();
+
+  if (resume_uart)
+    vTaskResume(uart_taskhandle);
+  if (restart_autobaud)
+    autobaud_start();
 }
 
 bool cdc_task(void)
@@ -276,11 +305,15 @@ void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* line_coding)
 
 void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
 {
+#ifndef PROBE_UART_HWFC
 #ifdef PROBE_UART_RTS
-  gpio_put(PROBE_UART_RTS, !rts);
+  uart_rts = rts;
+  gpio_put(probe_pin_mappings[PROBE_FUNC_UART_RTS], !rts);
+#endif
 #endif
 #ifdef PROBE_UART_DTR
-  gpio_put(PROBE_UART_DTR, !dtr);
+  uart_dtr = dtr;
+  gpio_put(probe_pin_mappings[PROBE_FUNC_UART_DTR], !dtr);
 #endif
 
   /* CDC drivers use linestate as a bodge to activate/deactivate the interface.

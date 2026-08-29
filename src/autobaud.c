@@ -46,9 +46,6 @@ static PIO pio;
 static int sm = -1;
 // PIO program offset
 static int offset = -1;
-// UART RX GPIO 1 pin
-static const uint rx_pin = PROBE_UART_RX;
-
 // Frequency hash table to store samples occurance
 static HashTable *freq_table;
 
@@ -321,7 +318,7 @@ bool autobaud_init() {
         return false;
     }
     float div = (float)clock_get_hz(clk_sys) / PIO_CLOCK_FREQUENCY;
-    autobaud_program_init(pio, sm, offset, rx_pin, div);
+    autobaud_program_init(pio, sm, offset, probe_pin_mappings[PROBE_FUNC_UART_RX], div);
     pio_sm_set_enabled(pio, sm, true);
 
     // Create hash table to keep count of sample occurance

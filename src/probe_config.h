@@ -26,6 +26,8 @@
 #ifndef PROBE_CONFIG_H_
 #define PROBE_CONFIG_H_
 
+#include <stdint.h>
+
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -71,6 +73,43 @@ do { \
 #include "board_debug_probe_config.h"
 #endif
 //#include "board_example_config.h"
+
+enum probe_function
+{
+#ifdef PROBE_PIN_SWCLK
+  PROBE_FUNC_SWCLK,
+#endif
+#ifdef PROBE_PIN_SWDIO
+  PROBE_FUNC_SWDIO,
+#endif
+#ifdef PROBE_PIN_SWDI
+  PROBE_FUNC_SWDI,
+#endif
+#ifdef PROBE_PIN_SWDIOEN
+  PROBE_FUNC_SWDIOEN,
+#endif
+#ifdef PROBE_PIN_RESET
+  PROBE_FUNC_RESET,
+#endif
+#ifdef PROBE_UART_RX
+  PROBE_FUNC_UART_RX,
+#endif
+#ifdef PROBE_UART_TX
+  PROBE_FUNC_UART_TX,
+#endif
+#if defined(PROBE_UART_HWFC) && defined(PROBE_UART_CTS)
+  PROBE_FUNC_UART_CTS,
+#endif
+#ifdef PROBE_UART_RTS
+  PROBE_FUNC_UART_RTS,
+#endif
+#ifdef PROBE_UART_DTR
+  PROBE_FUNC_UART_DTR,
+#endif
+  PROBE_FUNC_COUNT,
+};
+
+extern uint8_t probe_pin_mappings[PROBE_FUNC_COUNT];
 
 // Add the configuration to binary information
 void bi_decl_config();

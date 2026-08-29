@@ -5,6 +5,39 @@
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 
+uint8_t probe_pin_mappings[PROBE_FUNC_COUNT] = {
+#ifdef PROBE_PIN_SWCLK
+    [PROBE_FUNC_SWCLK] = PROBE_PIN_SWCLK,
+#endif
+#ifdef PROBE_PIN_SWDIO
+    [PROBE_FUNC_SWDIO] = PROBE_PIN_SWDIO,
+#endif
+#ifdef PROBE_PIN_SWDI
+    [PROBE_FUNC_SWDI] = PROBE_PIN_SWDI,
+#endif
+#ifdef PROBE_PIN_SWDIOEN
+    [PROBE_FUNC_SWDIOEN] = PROBE_PIN_SWDIOEN,
+#endif
+#ifdef PROBE_PIN_RESET
+    [PROBE_FUNC_RESET] = PROBE_PIN_RESET,
+#endif
+#ifdef PROBE_UART_RX
+    [PROBE_FUNC_UART_RX] = PROBE_UART_RX,
+#endif
+#ifdef PROBE_UART_TX
+    [PROBE_FUNC_UART_TX] = PROBE_UART_TX,
+#endif
+#if defined(PROBE_UART_HWFC) && defined(PROBE_UART_CTS)
+    [PROBE_FUNC_UART_CTS] = PROBE_UART_CTS,
+#endif
+#ifdef PROBE_UART_RTS
+    [PROBE_FUNC_UART_RTS] = PROBE_UART_RTS,
+#endif
+#ifdef PROBE_UART_DTR
+    [PROBE_FUNC_UART_DTR] = PROBE_UART_DTR,
+#endif
+};
+
 
 void bi_decl_config()
 {

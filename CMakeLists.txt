@@ -31,7 +31,7 @@ add_executable(debugprobe
 target_sources(debugprobe PRIVATE
         CMSIS_DAP/CMSIS/DAP/Firmware/Source/DAP.c
         CMSIS_DAP/CMSIS/DAP/Firmware/Source/JTAG_DP.c
-        CMSIS_DAP/CMSIS/DAP/Firmware/Source/DAP_vendor.c
+        src/dap_vendor.c
         CMSIS_DAP/CMSIS/DAP/Firmware/Source/SWO.c
         #CMSIS_DAP/CMSIS/DAP/Firmware/Source/SW_DP.c
         )

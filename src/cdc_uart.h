@@ -26,8 +26,12 @@
 #ifndef CDC_UART_H
 #define CDC_UART_H
 
+#include "FreeRTOS.h"
+#include "task.h"
+
 void cdc_thread(void *ptr);
 void cdc_uart_init(void);
+void cdc_uart_update_pins(void);
 bool cdc_task(void);
 
 extern TaskHandle_t uart_taskhandle;

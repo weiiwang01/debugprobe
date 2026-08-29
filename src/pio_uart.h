@@ -37,6 +37,7 @@ typedef enum
 } pio_uart_parity_t;
 
 void pio_uart_init(uint32_t baudrate);
+void pio_update_pins(void);
 void pio_uart_set_baudrate(uint32_t baudrate);
 void pio_uart_set_format(unsigned int data_bits, unsigned int stop_bits,
                          pio_uart_parity_t parity);

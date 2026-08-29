@@ -42,10 +42,10 @@
 #define PROBE_UART_HWFC
 
 /* Target reset GPIO (active-low). Omit if not used.*/
-#define PROBE_PIN_RESET 1
+#define PROBE_PIN_RESET 2
 
 #define PROBE_SM 0
-#define PROBE_PIN_OFFSET 12
+#define PROBE_PIN_OFFSET 0
 /* PIO config for PROBE_IO_RAW */
 #if defined(PROBE_IO_RAW)
 #define PROBE_PIN_SWCLK (PROBE_PIN_OFFSET + 0)
@@ -68,16 +68,16 @@
 #endif
 
 #if defined(PROBE_CDC_UART)
-#define PROBE_UART_TX 17
-#define PROBE_UART_RX 16
+#define PROBE_UART_TX 4
+#define PROBE_UART_RX 3
 /* The UART bridge claims two state machines from this PIO instance. */
 #define PROBE_UART_PIO pio1
 #define PROBE_UART_BAUDRATE 115200
 
 #if defined(PROBE_UART_HWFC)
 /* Hardware flow control - see 1.4.3 in the RP2040 datasheet for valid pin settings */
-#define PROBE_UART_CTS 6
-#define PROBE_UART_RTS 7
+#define PROBE_UART_CTS 5
+#define PROBE_UART_RTS 6
 #else
 /* Software flow control - RTS and DTR can be omitted if not used */
 #define PROBE_UART_RTS 9
@@ -87,7 +87,7 @@
 #endif
 
 /* LED config - some or all of these can be omitted if not used */
-#define PROBE_USB_CONNECTED_LED 2
+#define PROBE_USB_CONNECTED_LED 25
 #define PROBE_DAP_CONNECTED_LED 15
 #define PROBE_DAP_RUNNING_LED 16
 #define PROBE_UART_RX_LED 7
