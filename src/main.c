@@ -65,6 +65,36 @@ TaskHandle_t dap_taskhandle, tud_taskhandle, mon_taskhandle;
 
 static int was_configured;
 
+static void unused_pins_init(void)
+{
+    uint64_t enabled_pins = 0;
+    for (uint i = 0; i < PROBE_FUNC_COUNT; ++i)
+        enabled_pins |= 1ull << probe_pin_mappings[i];
+
+#ifdef PROBE_USB_CONNECTED_LED
+    enabled_pins |= 1ull << PROBE_USB_CONNECTED_LED;
+#endif
+#ifdef PROBE_DAP_CONNECTED_LED
+    enabled_pins |= 1ull << PROBE_DAP_CONNECTED_LED;
+#endif
+#ifdef PROBE_DAP_RUNNING_LED
+    enabled_pins |= 1ull << PROBE_DAP_RUNNING_LED;
+#endif
+#ifdef PROBE_UART_RX_LED
+    enabled_pins |= 1ull << PROBE_UART_RX_LED;
+#endif
+#ifdef PROBE_UART_TX_LED
+    enabled_pins |= 1ull << PROBE_UART_TX_LED;
+#endif
+
+    for (uint pin = 0; pin < NUM_BANK0_GPIOS; ++pin) {
+        if (!(enabled_pins & (1ull << pin))) {
+            gpio_deinit(pin);
+            gpio_disable_pulls(pin);
+        }
+    }
+}
+
 void dev_mon(void *ptr)
 {
     uint32_t sof[3];
@@ -155,6 +185,7 @@ int main(void) {
     stdio_uart_init();
 
     DAP_Setup();
+    unused_pins_init();
 
     probe_info("Welcome to debugprobe!\n");
 
