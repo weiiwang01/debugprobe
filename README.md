@@ -83,3 +83,16 @@ To enable AutoBaud, configure the USB CDC port to the following custom baud rate
 
 Changing the baud rate to any other value disables AutoBaud.
 
+## Dynamic pin binding
+
+CMSIS-DAP vendor command `0x80` changes debugprobe GPIO bindings at runtime. The exact length of the command arguments is determined by the number of function pins enabled in the build.
+
+```
+cmsis-dap cmd 0x80 [swclk] [swdio] [swdi] [swdioen] [reset] [uart_rx] [uart_tx] [uart_cts] [uart_rts] [uart_dtr]
+```
+
+For example, in a build that enables SWD, RESET, and USART, the following CMSIS-DAP command sets pin 18 to be SWCLK, pin 21 to be SWDIO, pin 20 to be RESET, pin 19 to be USART RX, and pin 1 to be USART TX:
+
+```
+cmsis-dap cmd 0x80 18 21 20 19 1
+```
